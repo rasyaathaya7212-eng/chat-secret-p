@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Protocol Node</title>
+    <meta name="description" content="Encrypted Real-Time Communication Node">
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Gun.js Real-Time Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+
+    <style>
+        /* ---------------------------------------------------------
+           MILITARY / HACKER TERMINAL THEME
+           --------------------------------------------------------- */
+        :root {
+            --bg-color: #050505;
+            --text-color: #00ff41;
+            --dim-color: #008f11;
+            --alert-color: #ff3333;
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+        }
+
+        /* Scanline & Flicker Effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .blink { animation: blinker 1s step-end infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+        /* ---------------------------------------------------------
+           LOGIN SCREEN
+           --------------------------------------------------------- */
+        #login-layer {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .auth-box {
+            border: 2px solid var(--text-color);
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0, 20, 0, 0.9);
+            box-shadow: 0 0 15px var(--dim-color);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed var(--dim-color);
+            padding-bottom: 10px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .input-group { margin-bottom: 15px; }
+
+        label {
+            display: block;
+            color: var(--dim-color);
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+        }
+
+        input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--dim-color);
+            color: var(--text-color);
+            padding: 10px;
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--text-color);
+            box-shadow: 0 0 5px var(--dim-color);
+        }
+
+        .btn-auth {
+            width: 100%;
+            background: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            font-family: var(--font-stack);
+            text-transform: uppercase;
+        }
+
+        .btn-auth:hover { background: var(--dim-color); }
+
+        #auth-msg {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+        }
+
+        /* ---------------------------------------------------------
+           CHAT SCREEN
+           --------------------------------------------------------- */
+        #chat-layer {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            z-index: 10;
+        }
+
+        .top-bar {
+            padding: 15px;
+            border-bottom: 1px solid var(--dim-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 15, 0, 0.8);
+        }
+
+        .status-led {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: var(--text-color);
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 8px var(--text-color);
+        }
+
+        .btn-term {
+            background: transparent;
+            border: 1px solid var(--alert-color);
+            color: var(--alert-color);
+            padding: 5px 12px;
+            cursor: pointer;
+            font-family: var(--font-stack);
+            font-size: 0.8rem;
+        }
+
+        .btn-term:hover {
+            background: var(--alert-color);
+            color: #000;
+        }
+
+        #terminal-feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 20, 0, 0.35);
+        }
+
+        .message-row { display: flex; width: 100%; }
+        .message-bubble {
+            max-width: 75%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--dim-color);
+            background: rgba(0, 15, 0, 0.35);
+            animation: typeIn 0.2s ease-out;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+        .bubble-right {
+            margin-left: auto;
+            border-color: var(--text-color);
+            background: rgba(0, 255, 65, 0.12);
+        }
+        .bubble-left {
+            margin-right: auto;
+            border-color: #00b3b3;
+            background: rgba(0, 30, 30, 0.25);
+        }
+
+        @keyframes typeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ts { color: var(--dim-color); font-size: 0.85rem; margin-right: 8px; }
+        .lbl { font-weight: bold; margin-right: 5px; }
+        .txt { color: #ccffcc; }
+
+        .control-panel {
+            padding: 15px;
+            border-top: 1px solid var(--dim-color);
+            background: rgba(0, 10, 0, 0.9);
+            display: flex;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        #cmd-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        #file-input { display: none; }
+        #camera-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
+            cursor: pointer;
+            background: transparent;
+        }
+        #camera-btn:hover { background: var(--text-color); color: var(--bg-color); }
+
+        .btn-send {
+            background: transparent;
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
+            padding: 5px 20px;
+            cursor: pointer;
+            font-family: var(--font-stack);
+            font-weight: bold;
+        }
+
+        .btn-send:hover {
+            background: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        .img-packet {
+            max-width: 100%;
+            border: 1px solid var(--text-color);
+            box-shadow: 0 0 10px rgba(0,255,65,0.4);
+            margin-top: 6px;
+        }
+
+        #sync-indicator {
+            font-size: 0.8rem;
+            color: var(--dim-color);
+            margin-left: 12px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #003300; }
+    </style>
+</head>
+<body>
+
+    <!-- LAYER 1: AUTHENTICATION -->
+    <div id="login-layer">
+        <div class="auth-box">
+            <div class="auth-header">:: SECURE PROTOCOL NODE ::</div>
+            <form id="auth-form">
+                <div class="input-group">
+                    <label>IDENTITY (USERNAME)</label>
+                    <input type="text" id="inp-user" placeholder="INPUT IDENTITY" autocomplete="off" required>
+                </div>
+                <div class="input-group">
+                    <label>ACCESS KEY</label>
+                    <input type="password" id="inp-key" placeholder="INPUT KEY" autocomplete="off" required>
+                </div>
+                <div class="input-group">
+                    <label>CONNECTION ID (ROOM)</label>
+                    <input type="text" id="inp-room" placeholder="INPUT ROOM ID" autocomplete="off" required>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button type="button" id="btn-register" class="btn-auth">CREATE ACCOUNT</button>
+                    <button type="button" id="btn-login" class="btn-auth">SECURE LOGIN</button>
+                </div>
+            </form>
+            <div id="auth-msg">SYSTEM STANDBY...</div>
+        </div>
+    </div>
+
+    <!-- LAYER 2: TERMINAL CHAT -->
+    <div id="chat-layer" class="hidden">
+        <div class="top-bar">
+            <div>
+                <span class="status-led blink"></span>
+                <span id="conn-status">UPLINK ESTABLISHED</span>
+                <span id="sync-indicator" class="blink" style="margin-left:12px;">SYNC IN: 3</span>
+            </div>
+            <div id="identity-display" style="font-size: 0.9rem; color: var(--dim-color);"></div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-term" id="btn-voicecall">VOICE CALL</button>
+                <button class="btn-term" id="btn-videocall">VIDEO CALL</button>
+                <button class="btn-term" id="btn-reset">RESET</button>
+                <button class="btn-term" id="btn-terminate">TERMINATE</button>
+            </div>
+        </div>
+
+        <div id="terminal-feed">
+            <div style="text-align: center; color: var(--dim-color); margin-top: 20px; font-style: italic;">
+                --- ENCRYPTED STREAM ACTIVE ---
+            </div>
+        </div>
+
+        <form id="msg-form" class="control-panel">
+            <span style="font-weight: bold; margin-right: 10px;">></span>
+            <input type="text" id="cmd-input" placeholder="TRANSMIT DATA..." autocomplete="off">
+            <input type="file" id="file-input" accept="image/*,.pdf,.doc,.docx,.txt,.zip">
+            <label id="camera-btn" for="file-input" aria-label="Upload">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M9 2l2 2h4a2 2 0 0 1 2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2a2 2 0 0 1 2-2h2L9 2zm3 6a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
+                </svg>
+            </label>
+            <button type="button" id="btn-voice" class="btn-send" title="Voice Note">🔊</button>
+            <button type="submit" class="btn-send">SEND</button>
+        </form>
+    </div>
+
+    <div id="dashboard-layer" class="hidden" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.7); z-index:9998;">
+        <div style="width:380px; background:#001500; border:1px solid var(--text-color); padding:16px;">
+            <div style="color:var(--text-color); margin-bottom:8px;">ROOM DASHBOARD</div>
+            <div id="room-list" style="max-height:200px; overflow:auto; border:1px solid var(--dim-color); padding:8px; margin-bottom:8px;"></div>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="dash-room" placeholder="Room ID" style="flex:1; background:transparent; border:1px solid var(--dim-color); color:var(--text-color); padding:8px;">
+                <button id="btn-enter-room" class="btn-term" style="border-color:var(--text-color); color:var(--text-color);">ENTER</button>
+            </div>
+        </div>
+    </div>
+    <div id="call-modal" class="hidden" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); z-index:9999;">
+        <div style="background:#001500; border:1px solid var(--text-color); padding:20px; width:300px; text-align:center;">
+            <div style="margin-bottom:12px; color:var(--text-color);">INCOMING CALL</div>
+            <div id="call-type" style="margin-bottom:12px; color:var(--dim-color);"></div>
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button id="btn-accept" class="btn-term" style="border-color:var(--text-color); color:var(--text-color);">ACCEPT</button>
+                <button id="btn-decline" class="btn-term">DECLINE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="video-overlay" class="hidden" style="position:fixed; right:20px; bottom:20px; width:320px; background:#001000; border:1px solid var(--dim-color); box-shadow:0 0 10px var(--dim-color); z-index:9999;">
+        <div style="padding:6px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--dim-color);">
+            <span style="color:var(--dim-color);">REMOTE UPLINK</span>
+            <button id="btn-endcall" class="btn-term">END</button>
+        </div>
+        <div style="position:relative;">
+            <video id="remoteVideo" autoplay playsinline style="width:100%; background:#000;"></video>
+            <video id="localVideo" autoplay muted playsinline style="position:absolute; right:6px; bottom:6px; width:96px; border:1px solid var(--dim-color);"></video>
+        </div>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------
+        // CONFIGURATION & RELAYS (High Availability)
+        // ---------------------------------------------------------
+        const GUN_RELAYS = [
+            'https://gun-manhattan.herokuapp.com/gun',
+            'https://peer.wall.org/gun',
+            'https://gun-us.herokuapp.com/gun'
+        ];
+        
+        function resolveLabel(user) {
+            if (!user) return 'UNKNOWN';
+            const u = String(user).toLowerCase();
+            if (u === 'rasya') return 'VISPER';
+            if (u === 'pengguna1') return 'GHOST';
+            return String(user).toUpperCase();
+        }
+
+        // ---------------------------------------------------------
+        // STATE MANAGEMENT
+        // ---------------------------------------------------------
+        let gun, db, userNode, roomsRoot, roomNode, chatRef, signalsCallRef, systemResetRef;
+        let currentUser = null;
+        let currentLabel = null;
+        let syncInterval = null;
+        let syncCountdown = 3;
+        let lastResetTs = 0;
+
+        // ---------------------------------------------------------
+        // DOM ELEMENTS
+        // ---------------------------------------------------------
+        const loginLayer = document.getElementById('login-layer');
+        const chatLayer = document.getElementById('chat-layer');
+        const authForm = document.getElementById('auth-form');
+        const authMsg = document.getElementById('auth-msg');
+        const btnRegister = document.getElementById('btn-register');
+        const btnLogin = document.getElementById('btn-login');
+        const terminalFeed = document.getElementById('terminal-feed');
+        const msgForm = document.getElementById('msg-form');
+        const cmdInput = document.getElementById('cmd-input');
+        const syncIndicator = document.getElementById('sync-indicator');
+        const fileInput = document.getElementById('file-input');
+
+        const SESSION_KEY = 'secure_proto_session_v1';
+        function saveSession(identity, room) {
+            try {
+                sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+                    user: identity.user,
+                    key: identity.key,
+                    room
+                }));
+                sessionStorage.setItem('username', identity.user);
+                sessionStorage.setItem('room', room);
+                sessionStorage.setItem('key', identity.key);
+            } catch (_) {}
+        }
+        function checkSession() {
+            try {
+                const raw = sessionStorage.getItem(SESSION_KEY);
+                if (!raw) return;
+                const s = JSON.parse(raw);
+                if (s && s.user && s.key && s.room) {
+                    initSession({ user: s.user, key: s.key }, s.room);
+                } else { sessionStorage.removeItem(SESSION_KEY); }
+            } catch (_) {
+                sessionStorage.removeItem(SESSION_KEY);
+            }
+        }
+
+        btnRegister.addEventListener('click', async () => {
+            const u = document.getElementById('inp-user').value.trim();
+            const k = document.getElementById('inp-key').value.trim();
+            const r = document.getElementById('inp-room').value.trim();
+            if (!u || !k || !r) {
+                authMsg.textContent = "ERROR: ACCESS DENIED";
+                authMsg.style.color = "var(--alert-color)";
+                return;
+            }
+            if (!gun) { gun = Gun(GUN_RELAYS); }
+            db = gun.get('ZION_DATABASE_V10');
+            userNode = db.get('users').get(u);
+            let exists = null;
+            await new Promise(res => userNode.once(v => { exists = v; res(); }));
+            const gunUser = gun.user();
+            await new Promise((res) => gunUser.create(u, k, () => res()));
+            userNode.put(JSON.stringify({ alias: u, ts: Date.now() }));
+            userNode.get('rooms').get(r).put(true);
+            saveSession({ user: u, key: k }, r);
+            showDashboard(u, r);
+        });
+        btnLogin.addEventListener('click', async () => {
+            const u = document.getElementById('inp-user').value.trim();
+            const k = document.getElementById('inp-key').value.trim();
+            const r = document.getElementById('inp-room').value.trim();
+            if (!u || !k || !r) {
+                authMsg.textContent = "ERROR: ACCESS DENIED";
+                authMsg.style.color = "var(--alert-color)";
+                return;
+            }
+            if (!gun) { gun = Gun(GUN_RELAYS); }
+            db = gun.get('ZION_DATABASE_V10');
+            userNode = db.get('users').get(u);
+            const gunUser = gun.user();
+            let ok = false;
+            await new Promise((res) => gunUser.auth(u, k, (ack) => { ok = !ack.err; res(); }));
+            if (!ok) {
+                authMsg.textContent = "ERROR: BAD CREDENTIALS";
+                authMsg.style.color = "var(--alert-color)";
+                return;
+            }
+            userNode.get('rooms').get(r).put(true);
+            saveSession({ user: u, key: k }, r);
+            showDashboard(u, r);
+        });
+
+        // ---------------------------------------------------------
+        // SESSION INITIALIZATION (CRITICAL SYNC LOGIC)
+        // ---------------------------------------------------------
+        function initSession(identity, room) {
+            currentUser = identity.user;
+            currentLabel = resolveLabel(identity.user);
+
+            // Update UI
+            loginLayer.classList.add('hidden');
+            chatLayer.classList.remove('hidden');
+            document.getElementById('identity-display').textContent = `[${currentLabel}] @ SECTOR ${room}`;
+
+            if (!gun) { gun = Gun(GUN_RELAYS); }
+            db = gun.get('ZION_DATABASE_V10');
+            roomsRoot = db.get('rooms');
+            roomNode = roomsRoot.get(room);
+            chatRef = roomNode.get('chat_stream');
+            signalsCallRef = roomNode.get('signal_voip');
+            systemResetRef = roomNode.get('signal_sys');
+            setupSignaling();
+            setupReset();
+
+            // AGGRESSIVE AUTO-SYNC:
+            // Use .map().on() for immediate updates.
+            // Gun.js automatically handles deduplication internally, 
+            // but we ensure UI deduplication with renderedIds.
+            chatRef.map().on((raw, id) => {
+                if (!raw) return;
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { return; }
+                if (!isValidTimestamp(data.time)) return;
+                renderMessage(data, id);
+            });
+
+            if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+            syncIndicator.textContent = "LIVE";
+            startHeartbeat();
+        }
+
+        function deepFetch() {}
+
+        function showDashboard(user, preselect) {
+            loginLayer.classList.add('hidden');
+            const dash = document.getElementById('dashboard-layer');
+            const list = document.getElementById('room-list');
+            const input = document.getElementById('dash-room');
+            const enter = document.getElementById('btn-enter-room');
+            dash.classList.remove('hidden');
+            list.innerHTML = '';
+            if (!gun) { gun = Gun(GUN_RELAYS); }
+            db = gun.get('ZION_DATABASE_V10');
+            const uNode = db.get('users').get(user).get('rooms');
+            const rooms = new Set();
+            uNode.map().once((v, id) => { if (v) { rooms.add(id); } });
+            setTimeout(() => {
+                rooms.forEach(id => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-term';
+                    btn.style.margin = '4px';
+                    btn.textContent = id;
+                    btn.addEventListener('click', () => {
+                        dash.classList.add('hidden');
+                        // Reload to ensure clean slate when switching rooms
+                        sessionStorage.setItem('room', id);
+                        location.reload();
+                    });
+                    list.appendChild(btn);
+                });
+                if (preselect) {
+                    input.value = preselect;
+                    dash.classList.add('hidden');
+                    initSession({ user, key: sessionStorage.getItem('key') }, preselect);
+                }
+            }, 400);
+            enter.addEventListener('click', () => {
+                const r = input.value.trim();
+                if (!r) return;
+                db.get('users').get(user).get('rooms').get(r).put(true);
+                dash.classList.add('hidden');
+                // Reload to ensure clean slate when switching rooms
+                sessionStorage.setItem('room', r);
+                location.reload();
+            });
+        }
+
+        // Connectivity status is now handled in startHeartbeat loop
+
+        // ---------------------------------------------------------
+        // HISTORY LOAD (Initial fetch on join/refresh)
+        // ---------------------------------------------------------
+        const initialBuffer = [];
+        function loadMessages() {
+            initialBuffer.length = 0;
+            chatRef.map().once((raw, id) => {
+                if (!raw) return;
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { return; }
+                if (!isValidTimestamp(data.time)) return;
+                initialBuffer.push({ data, id });
+                initialBuffer.sort((a, b) => {
+                    const ta = a.data && a.data.time ? a.data.time : 0;
+                    const tb = b.data && b.data.time ? b.data.time : 0;
+                    return ta - tb;
+                });
+                for (let i = 0; i < initialBuffer.length; i++) {
+                    const item = initialBuffer[i];
+                    if (!renderedIds.has(item.id)) {
+                        renderMessage(item.data, item.id);
+                    }
+                }
+            });
+        }
+
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
+            ]
+        };
+        let pc = null;
+        let localStream = null;
+        let pendingOffer = null;
+        const btnVoiceCall = document.getElementById('btn-voicecall');
+        const btnVideoCall = document.getElementById('btn-videocall');
+        const callModal = document.getElementById('call-modal');
+        const callTypeLabel = document.getElementById('call-type');
+        const btnAccept = document.getElementById('btn-accept');
+        const btnDecline = document.getElementById('btn-decline');
+        const videoOverlay = document.getElementById('video-overlay');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const localVideo = document.getElementById('localVideo');
+        const btnEndCall = document.getElementById('btn-endcall');
+
+        function openModal(type) {
+            callTypeLabel.textContent = type === 'video' ? 'VIDEO' : 'VOICE';
+            callModal.classList.remove('hidden');
+        }
+        function closeModal() {
+            callModal.classList.add('hidden');
+        }
+        function showOverlay() {
+            videoOverlay.classList.remove('hidden');
+        }
+        function hideOverlay() {
+            videoOverlay.classList.add('hidden');
+        }
+        async function createPC() {
+            pc = new RTCPeerConnection(rtcConfig);
+            pc.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
+            };
+            pc.onicecandidate = (e) => {
+                if (e.candidate) {
+                    signalsCallRef.get('ice').set(JSON.stringify({ from: currentUser, candidate: e.candidate }));
+                }
+            };
+        }
+        async function startCall(kind) {
+            await createPC();
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia(kind === 'video' ? { audio: true, video: true } : { audio: true });
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                localVideo.srcObject = localStream;
+                showOverlay();
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                signalsCallRef.get('offer').put(JSON.stringify({ from: currentUser, kind, sdp: offer.sdp }));
+            } catch (_) {}
+        }
+        async function acceptCall() {
+            closeModal();
+            if (!pendingOffer) return;
+            await createPC();
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia(pendingOffer.kind === 'video' ? { audio: true, video: true } : { audio: true });
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                localVideo.srcObject = localStream;
+                showOverlay();
+                const desc = { type: 'offer', sdp: pendingOffer.sdp };
+                await pc.setRemoteDescription(desc);
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                signalsCallRef.get('answer').put(JSON.stringify({ from: currentUser, sdp: answer.sdp }));
+                pendingOffer = null;
+            } catch (_) {}
+        }
+        function declineCall() {
+            closeModal();
+            pendingOffer = null;
+        }
+        function endCall() {
+            try {
+                if (pc) { pc.close(); pc = null; }
+                if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+                hideOverlay();
+            } catch (_) {}
+        }
+        if (btnVoiceCall) { btnVoiceCall.addEventListener('click', () => startCall('voice')); }
+        if (btnVideoCall) { btnVideoCall.addEventListener('click', () => startCall('video')); }
+        if (btnAccept) { btnAccept.addEventListener('click', acceptCall); }
+        if (btnDecline) { btnDecline.addEventListener('click', declineCall); }
+        if (btnEndCall) { btnEndCall.addEventListener('click', endCall); }
+
+        if (!signalsCallRef) { /* initialized in initSession */ }
+        function setupSignaling() {
+            signalsCallRef.get('offer').on((raw, id) => {
+                if (!raw) return;
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { return; }
+                if (!data || data.from === currentUser) return;
+                pendingOffer = { kind: data.kind, sdp: data.sdp, from: data.from };
+                openModal(data.kind);
+            });
+            signalsCallRef.get('answer').on((raw) => {
+                if (!raw) return;
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { return; }
+                if (!data || data.from === currentUser) return;
+                const desc = { type: 'answer', sdp: data.sdp };
+                if (pc) { pc.setRemoteDescription(desc); }
+            });
+            signalsCallRef.get('ice').map().on((raw) => {
+                if (!raw) return;
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { return; }
+                if (!data || data.from === currentUser) return;
+                if (pc && data.candidate) {
+                    pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            });
+        }
+        function setupReset() {
+            systemResetRef.get('requests').on((raw) => {
+                if (!raw) return;
+                let data;
+                try { data = JSON.parse(raw); } catch (_) { return; }
+                if (data.type !== 'RESET_REQUEST') return;
+                if (data.from === currentUser) return;
+                const ok = window.confirm('RESET REQUEST RECEIVED. CONFIRM?');
+                if (ok) {
+                    systemResetRef.get('confirmations').get(currentUser).put(true);
+                    let voters = new Set();
+                    systemResetRef.get('confirmations').map().once(v => { if (v) voters.add(v); });
+                    setTimeout(() => {
+                        if (voters.size >= 2) {
+                            chatRef.put(null);
+                            systemResetRef.get('execute').put(JSON.stringify({ ts: Date.now() }));
+                            renderedIds.clear();
+                            const feed = document.getElementById('terminal-feed');
+                            if (feed) { feed.innerHTML = ''; }
+                        }
+                    }, 300);
+                }
+            });
+            systemResetRef.get('execute').on((raw) => {
+                if (!raw) return;
+                let ex;
+                try { ex = JSON.parse(raw); } catch (_) { return; }
+                if (!ex.ts) return;
+                renderedIds.clear();
+                const feed = document.getElementById('terminal-feed');
+                if (feed) { feed.innerHTML = ''; }
+            });
+        }
+        function isValidTimestamp(t) {
+            if (typeof t !== 'number') return false;
+            if (t <= 0) return false;
+            if (t > Date.now() + 300000) return false;
+            return true;
+        }
+
+        // ---------------------------------------------------------
+        // MESSAGE TRANSMISSION
+        // ---------------------------------------------------------
+        msgForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const msg = cmdInput.value.trim();
+            if (!msg) return;
+
+            // Construct Payload
+            const payload = { 
+                sender: currentUser, 
+                text: msg, 
+                time: Date.now() 
+            };
+
+            // INSTANT PROPAGATION: .set() pushes to the graph
+            // All connected peers will receive this via .on() immediately
+            chatRef.set(JSON.stringify(payload));
+
+            cmdInput.value = '';
+            cmdInput.focus();
+        });
+
+        // File/Image transmission
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (file.type && file.type.startsWith('image/')) {
+                const dataUrl = await compressImage(file, 300, 0.6);
+                if (!dataUrl) return;
+                chatRef.set(JSON.stringify({ sender: currentUser, type: 'image', name: file.name, mime: 'image/jpeg', data: dataUrl, time: Date.now() }));
+                fileInput.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = reader.result;
+                chatRef.set(JSON.stringify({ sender: currentUser, type: 'file', name: file.name, mime: file.type || '', data: dataUrl, time: Date.now() }));
+                fileInput.value = '';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        async function compressImage(file, maxW, quality) {
+            return new Promise((resolve) => {
+                const fr = new FileReader();
+                fr.onload = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const scale = Math.min(1, maxW / img.width);
+                        const w = Math.round(img.width * scale);
+                        const h = Math.round(img.height * scale);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        try {
+                            const out = canvas.toDataURL('image/jpeg', quality);
+                            resolve(out);
+                        } catch (_) {
+                            resolve(null);
+                        }
+                    };
+                    img.src = fr.result;
+                };
+                fr.readAsDataURL(file);
+            });
+        }
+        let isRecording = false;
+        let micStream = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        const btnVoice = document.getElementById('btn-voice');
+        if (btnVoice) {
+            btnVoice.addEventListener('mousedown', async () => {
+                if (isRecording) return;
+                isRecording = true;
+                try {
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
+                    mediaRecorder.start();
+                } catch (_) { isRecording = false; }
+            });
+            const stopAndSend = async () => {
+                if (!isRecording) return;
+                isRecording = false;
+                try {
+                    mediaRecorder.stop();
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const fr = new FileReader();
+                        fr.onload = () => {
+                            const base64 = fr.result;
+                            chatRef.set(JSON.stringify({ sender: currentUser, type: 'audio', name: `voice_${Date.now()}.webm`, mime: 'audio/webm', data: base64, time: Date.now() }));
+                            audioChunks = [];
+                        };
+                        fr.readAsDataURL(blob);
+                        micStream.getTracks().forEach(t => t.stop());
+                        micStream = null;
+                    };
+                } catch (_) { isRecording = false; }
+            };
+            btnVoice.addEventListener('mouseup', stopAndSend);
+            btnVoice.addEventListener('mouseleave', stopAndSend);
+            btnVoice.addEventListener('touchend', stopAndSend);
+        }
+        function startHeartbeat() {
+            if (!gun || !currentUser) return;
+            const pingNode = gun.get('ZION_DATABASE_V10').get('ping_check').get(currentUser);
+            const beat = () => {
+                const t0 = Date.now();
+                pingNode.put(JSON.stringify({ t: t0 }));
+                pingNode.once((raw) => {
+                    let rtt = Date.now() - t0;
+                    try { const parsed = JSON.parse(raw); if (parsed && parsed.t) { rtt = Math.max(1, Date.now() - parsed.t); } } catch (_) {}
+                    updatePing(rtt);
+                });
+                
+                // Connection Status LED Logic
+                const peers = gun._.opt.peers;
+                const connected = Object.keys(peers).length > 0; 
+                const led = document.querySelector('.status-led');
+                if (led) {
+                     led.style.background = connected ? '#00ff41' : '#ff3333';
+                     led.style.boxShadow = connected ? '0 0 8px #00ff41' : '0 0 8px #ff3333';
+                }
+            };
+            beat();
+            setInterval(beat, 1500);
+        }
+
+        function updatePing(rtt) {
+            const el = document.getElementById('conn-status');
+            if (!el) return;
+            el.textContent = `PING: ${rtt}ms`;
+            if (rtt < 100) el.style.color = 'var(--text-color)';
+            else if (rtt < 300) el.style.color = '#ffcc00';
+            else el.style.color = 'var(--alert-color)';
+        }
+
+        // ---------------------------------------------------------
+        // RENDERING ENGINE (Reactive DOM Updates)
+        // ---------------------------------------------------------
+        const renderedIds = new Set();
+
+        function renderMessage(data, id) {
+            // Deduplication: Prevent rendering the same message ID twice
+            if (renderedIds.has(id)) return;
+            renderedIds.add(id);
+
+            // Validate Payload
+            if (!data.sender || !data.time) return;
+
+            const row = document.createElement('div');
+            const myUsername = sessionStorage.getItem('username');
+            const self = data.sender === myUsername;
+            row.className = 'message-row';
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble ' + (self ? 'bubble-right' : 'bubble-left');
+
+            const date = new Date(data.time);
+            const timeStr = date.toLocaleTimeString('en-US', { hour12: false });
+
+            // Resolve System Label (Visper vs Ghost)
+            const displayLabel = resolveLabel(data.sender);
+
+            const tsSpan = document.createElement('span');
+            tsSpan.className = 'ts';
+            tsSpan.textContent = `[${timeStr}]`;
+            bubble.appendChild(tsSpan);
+
+            const lblSpan = document.createElement('span');
+            lblSpan.className = 'lbl';
+            lblSpan.textContent = `${displayLabel}:`;
+            bubble.appendChild(lblSpan);
+
+            if (data.type === 'image' && data.data) {
+                const imgWrap = document.createElement('div');
+                const img = document.createElement('img');
+                img.className = 'img-packet';
+                img.alt = data.name || 'image';
+                img.src = data.data;
+                imgWrap.appendChild(img);
+                bubble.appendChild(imgWrap);
+            } else if (data.type === 'file' && data.data) {
+                const txtSpan = document.createElement('span');
+                txtSpan.className = 'txt';
+                const a = document.createElement('a');
+                a.href = data.data;
+                a.download = data.name || 'download';
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.textContent = data.name || 'download';
+                txtSpan.textContent = 'File: ';
+                txtSpan.appendChild(a);
+                bubble.appendChild(txtSpan);
+            } else if (data.type === 'audio' && data.data) {
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = data.data;
+                bubble.appendChild(audio);
+            } else if (data.text) {
+                const txtSpan = document.createElement('span');
+                txtSpan.className = 'txt';
+                txtSpan.textContent = data.text;
+                bubble.appendChild(txtSpan);
+            } else {
+                return;
+            }
+
+            // Append and Auto-Scroll
+            row.appendChild(bubble);
+            terminalFeed.appendChild(row);
+            const img = bubble.querySelector('img');
+            if (img) {
+                img.onload = () => scrollToBottom();
+            }
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            terminalFeed.scrollTop = terminalFeed.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return "";
+            return text.replace(/&/g, "&amp;")
+                       .replace(/</g, "&lt;")
+                       .replace(/>/g, "&gt;")
+                       .replace(/"/g, "&quot;")
+                       .replace(/'/g, "&#039;");
+        }
+
+        // ---------------------------------------------------------
+        // SYSTEM TERMINATION
+        // ---------------------------------------------------------
+        document.getElementById('btn-terminate').addEventListener('click', () => {
+            if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+            sessionStorage.removeItem(SESSION_KEY);
+            location.reload();
+        });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            if (!confirm("Confirm Reset?")) return;
+            try {
+                const user = sessionStorage.getItem('username') || currentUser;
+                if (!roomNode || !user) return;
+                systemResetRef.get('requests').set(JSON.stringify({ type: 'RESET_REQUEST', from: user, time: Date.now() }));
+                systemResetRef.get('confirmations').get(user).put(true);
+            } catch (_) {}
+        });
+
+        window.onload = () => {
+            checkSession();
+            const userField = document.getElementById('inp-user');
+            if (userField && !loginLayer.classList.contains('hidden')) {
+                userField.focus();
+            }
+        };
+
+        (function() {
+            try {
+                const swCode = "self.addEventListener('install',e=>{e.waitUntil(caches.open('zion-v1').then(c=>c.addAll(['./'])))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))})";
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                if ('serviceWorker' in navigator) { navigator.serviceWorker.register(swUrl); }
+                const manifest = { name: "ZION Terminal", short_name: "ZION", start_url: ".", display: "standalone", background_color: "#050505", theme_color: "#00ff41", icons: [] };
+                const manBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+                const manUrl = URL.createObjectURL(manBlob);
+                const link = document.createElement('link');
+                link.rel = 'manifest';
+                link.href = manUrl;
+                document.head.appendChild(link);
+            } catch (_) {}
+        })();
+
+    </script>
+</body>
+</html>

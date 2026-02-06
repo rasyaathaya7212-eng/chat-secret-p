@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Secure Link v4.0</title>
+    <meta name="description" content="Encrypted P2P Communication Node">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- Gun.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+
+    <style>
+        /* ---------------------------------------------------------
+           CORE THEME & RESET
+           --------------------------------------------------------- */
+        :root {
+            --bg-color: #080808;
+            --text-primary: #00ff41;
+            --text-secondary: #008f11;
+            --alert-color: #ff3333;
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* Prevent selection for "app-like" feel */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-stack);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+        }
+
+        /* ---------------------------------------------------------
+           CRT OVERLAY EFFECTS
+           --------------------------------------------------------- */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .glow {
+            text-shadow: 0 0 5px var(--text-secondary);
+        }
+
+        /* ---------------------------------------------------------
+           UI UTILITIES
+           --------------------------------------------------------- */
+        .hidden {
+            display: none !important;
+        }
+
+        .screen {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            padding: 10px;
+        }
+
+        /* ---------------------------------------------------------
+           LOGIN PHASE
+           --------------------------------------------------------- */
+        #login-view {
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-box {
+            border: 1px solid var(--text-primary);
+            padding: 20px;
+            width: 100%;
+            max-width: 350px;
+            background: rgba(0, 20, 0, 0.8);
+            box-shadow: 0 0 15px var(--text-secondary);
+        }
+
+        .login-header {
+            text-align: center;
+            border-bottom: 1px solid var(--text-secondary);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .input-row {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            padding: 10px;
+            font-family: var(--font-stack);
+            font-size: 1em;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--text-primary);
+            box-shadow: 0 0 5px var(--text-secondary);
+        }
+
+        button.btn-primary {
+            width: 100%;
+            background: var(--text-primary);
+            color: var(--bg-color);
+            border: none;
+            padding: 12px;
+            font-family: var(--font-stack);
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button.btn-primary:active {
+            background: var(--text-secondary);
+        }
+
+        #auth-status {
+            margin-top: 15px;
+            text-align: center;
+            min-height: 1.5em;
+            font-size: 0.9em;
+        }
+
+        .error-msg { color: var(--alert-color); }
+        .success-msg { color: var(--text-primary); }
+
+        /* ---------------------------------------------------------
+           CHAT PHASE
+           --------------------------------------------------------- */
+        #chat-view {
+            display: none; /* Hidden by default */
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .led {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--text-primary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        #message-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid #111;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: rgba(0, 10, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .msg-item {
+            display: flex;
+            flex-direction: column;
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .msg-meta {
+            font-size: 0.7em;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .msg-text {
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .msg-own .msg-text {
+            color: #ccffcc; /* Slightly brighter for own messages */
+        }
+
+        .chat-footer {
+            display: flex;
+            gap: 10px;
+        }
+
+        #msg-input {
+            flex-grow: 1;
+        }
+
+        #btn-send {
+            width: auto;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid var(--text-primary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-family: var(--font-stack);
+        }
+
+        #btn-send:hover {
+            background: var(--text-primary);
+            color: var(--bg-color);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: var(--text-secondary); }
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <!-- VIEW: LOGIN -->
+    <div id="login-view" class="screen">
+        <div class="login-box">
+            <div class="login-header">:: ENCRYPTED LINK ACCESS ::</div>
+            <form id="login-form">
+                <div class="input-row">
+                    <label>CODENAME</label>
+                    <input type="text" id="inp-user" placeholder="IDENTITY" autocomplete="off" required>
+                </div>
+                <div class="input-row">
+                    <label>ROOM ID</label>
+                    <input type="text" id="inp-room" placeholder="SECTOR" autocomplete="off" required>
+                </div>
+                <div class="input-row">
+                    <label>ACCESS KEY</label>
+                    <input type="password" id="inp-key" placeholder="PASSKEY" autocomplete="off" required>
+                </div>
+                <button type="submit" class="btn-primary">ESTABLISH UPLINK</button>
+            </form>
+            <div id="auth-status">WAITING FOR CREDENTIALS...</div>
+        </div>
+    </div>
+
+    <!-- VIEW: CHAT -->
+    <div id="chat-view" class="screen hidden">
+        <div class="chat-header">
+            <div class="status-indicator">
+                <div class="led"></div>
+                <span>SECURE CONNECTION</span>
+            </div>
+            <div id="session-info">SECTOR: ???</div>
+        </div>
+        
+        <div id="message-list">
+            <!-- Messages injected here -->
+            <div style="text-align:center; color: var(--text-secondary); margin-top: 20px;">
+                --- BEGIN ENCRYPTED TRANSMISSION ---
+            </div>
+        </div>
+
+        <form id="chat-form" class="chat-footer">
+            <input type="text" id="msg-input" placeholder="TRANSMIT MESSAGE..." autocomplete="off">
+            <button type="submit" id="btn-send">SEND</button>
+        </form>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------
+        // CONFIGURATION & CONSTANTS
+        // ---------------------------------------------------------
+        const GUN_RELAYS = ['https://gun-manhattan.herokuapp.com/gun'];
+        
+        // HARDCODED AUTHENTICATION RULES
+        const AUTH_DB = [
+            { user: 'rasya', key: '123', room: '5678' },
+            { user: 'PENGGUNA1', key: '1234', room: '5678' }
+        ];
+
+        // ---------------------------------------------------------
+        // APP STATE
+        // ---------------------------------------------------------
+        let gun;
+        let chatNode;
+        let currentUser = null;
+        let currentRoom = null;
+        
+        // ---------------------------------------------------------
+        // DOM ELEMENTS
+        // ---------------------------------------------------------
+        const loginView = document.getElementById('login-view');
+        const chatView = document.getElementById('chat-view');
+        const authStatus = document.getElementById('auth-status');
+        const sessionInfo = document.getElementById('session-info');
+        const msgList = document.getElementById('message-list');
+        const inpMsg = document.getElementById('msg-input');
+
+        // ---------------------------------------------------------
+        // LOGIC: AUTHENTICATION
+        // ---------------------------------------------------------
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const u = document.getElementById('inp-user').value.trim();
+            const r = document.getElementById('inp-room').value.trim();
+            const k = document.getElementById('inp-key').value.trim();
+
+            // 1. Validate against Hardcoded DB
+            const isValid = AUTH_DB.some(record => 
+                record.user === u && 
+                record.key === k && 
+                record.room === r
+            );
+
+            if (isValid) {
+                authStatus.textContent = "CREDENTIALS VERIFIED. INITIALIZING...";
+                authStatus.className = "success-msg glow";
+                
+                setTimeout(() => {
+                    initChat(u, r, k);
+                }, 1000);
+            } else {
+                authStatus.textContent = "ACCESS DENIED: INVALID HANDSHAKE";
+                authStatus.className = "error-msg glow";
+            }
+        });
+
+        // ---------------------------------------------------------
+        // LOGIC: CHAT INITIALIZATION
+        // ---------------------------------------------------------
+        function initChat(user, room, key) {
+            currentUser = user;
+            currentRoom = room;
+
+            // Switch UI
+            loginView.classList.add('hidden');
+            chatView.classList.remove('hidden');
+            chatView.style.display = 'flex'; // Ensure flex layout applies
+            sessionInfo.textContent = `SECTOR: ${room} | OPERATOR: ${user}`;
+
+            // Initialize Gun
+            gun = Gun(GUN_RELAYS);
+
+            // Create Unique Room Path (Hashed for Isolation)
+            // We combine Room + Key to ensure isolation
+            const roomHash = btoa(`${room}_${key}`); 
+            const channelPath = `stealth-messenger-v1/sectors/${roomHash}`;
+
+            chatNode = gun.get(channelPath);
+
+            // Subscribe to Messages
+            // .map() iterates over every node in the set
+            // .on() listens for changes in real-time
+            chatNode.map().on((data, id) => {
+                if (data) {
+                    renderMessage(data, id);
+                }
+            });
+        }
+
+        // ---------------------------------------------------------
+        // LOGIC: SENDING MESSAGES
+        // ---------------------------------------------------------
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = inpMsg.value.trim();
+            
+            if (!text) return;
+
+            const payload = {
+                user: currentUser,
+                text: text,
+                timestamp: Date.now()
+            };
+
+            // Send to Gun Network
+            chatNode.set(payload);
+
+            // Clear Input
+            inpMsg.value = '';
+            inpMsg.focus();
+        });
+
+        // ---------------------------------------------------------
+        // LOGIC: RENDERING
+        // ---------------------------------------------------------
+        const renderedMessages = new Set();
+        const messageBuffer = []; // To help with sorting if needed
+
+        function renderMessage(data, id) {
+            if (renderedMessages.has(id)) return;
+            renderedMessages.add(id);
+
+            // Validation
+            if (!data.text || !data.user || !data.timestamp) return;
+
+            // Create Message Element
+            const el = document.createElement('div');
+            el.className = 'msg-item';
+            if (data.user === currentUser) el.classList.add('msg-own');
+
+            const time = new Date(data.timestamp).toLocaleTimeString([], { hour12: false });
+
+            el.innerHTML = `
+                <div class="msg-meta">[${time}] ${escapeHtml(data.user)}</div>
+                <div class="msg-text">${escapeHtml(data.text)}</div>
+            `;
+
+            // Append and Scroll
+            // Note: Gun.map() is unordered. For a simple chat, appending as they arrive 
+            // is "good enough" for real-time. For perfect history, we'd sort the DOM.
+            msgList.appendChild(el);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            msgList.scrollTop = msgList.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag]));
+        }
+
+        // Auto-focus logic
+        window.onload = () => {
+            document.getElementById('inp-user').focus();
+        };
+
+    </script>
+</body>
+</html>

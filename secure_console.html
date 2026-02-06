@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Private Console</title>
+    <meta name="description" content="Encrypted Protocol Data Sync Interface. Authorized Access Only.">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- External Libraries via High-Reputation CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+
+    <style>
+        :root {
+            --terminal-bg: #050505;
+            --terminal-fg: #00ff41;
+            --terminal-dim: #008f11;
+            --alert-color: #ff3333;
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--terminal-bg);
+            color: var(--terminal-fg);
+            font-family: var(--font-stack);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Scanline Effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 10;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Login Screen */
+        #auth-view {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+        }
+
+        .auth-box {
+            border: 1px solid var(--terminal-fg);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--terminal-fg);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+
+        input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--terminal-dim);
+            color: var(--terminal-fg);
+            padding: 10px;
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--terminal-fg);
+            box-shadow: 0 0 5px var(--terminal-dim);
+        }
+
+        button {
+            width: 100%;
+            background: var(--terminal-fg);
+            color: var(--terminal-bg);
+            border: none;
+            padding: 12px;
+            font-family: var(--font-stack);
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--terminal-dim);
+        }
+
+        .status-msg {
+            margin-top: 15px;
+            min-height: 20px;
+            font-size: 0.9rem;
+        }
+
+        .error {
+            color: var(--alert-color);
+        }
+
+        /* Chat Interface */
+        #console-view {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+        }
+
+        .header {
+            border-bottom: 1px solid var(--terminal-dim);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-status {
+            font-size: 0.8rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--terminal-fg);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        #log-output {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid var(--terminal-dim);
+            padding: 15px;
+            margin-bottom: 15px;
+            background: rgba(0, 20, 0, 0.3);
+            font-size: 0.95rem;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+
+        .timestamp {
+            opacity: 0.7;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+
+        .user-tag {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .user-rasya { color: #00ff41; } /* Standard Green */
+        .user-pengguna1 { color: #00ffff; } /* Cyan for contrast */
+
+        .cli-input {
+            display: flex;
+            border-top: 1px solid var(--terminal-dim);
+            padding-top: 15px;
+        }
+
+        .prompt {
+            margin-right: 10px;
+            padding-top: 10px;
+        }
+
+        #cmd-input {
+            flex-grow: 1;
+            border: none;
+            background: transparent;
+            color: var(--terminal-fg);
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            padding: 10px 0;
+        }
+
+        #cmd-input:focus {
+            outline: none;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--terminal-bg); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--terminal-dim); 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--terminal-fg); 
+        }
+
+        .blink {
+            animation: blinker 1s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- AUTHENTICATION VIEW -->
+        <div id="auth-view">
+            <div class="auth-box">
+                <h2 style="margin-bottom: 20px;">SYSTEM AUTHENTICATION</h2>
+                <form id="auth-form">
+                    <div class="input-group">
+                        <label for="username">Identity Tag</label>
+                        <input type="text" id="username" autocomplete="off" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="room-id">Sector ID</label>
+                        <input type="text" id="room-id" autocomplete="off" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="enc-key">Decryption Key</label>
+                        <input type="password" id="enc-key" autocomplete="off" required>
+                    </div>
+                    <button type="submit">Initialize Handshake</button>
+                </form>
+                <div id="auth-status" class="status-msg"></div>
+            </div>
+        </div>
+
+        <!-- CONSOLE VIEW -->
+        <div id="console-view">
+            <div class="header">
+                <div>SECURE PROTOCOL V.1.0</div>
+                <div class="connection-status">
+                    <span class="status-indicator"></span>
+                    SYNC: ACTIVE
+                </div>
+                <div id="session-info"></div>
+            </div>
+            
+            <div id="log-output">
+                <!-- Chat messages will appear here -->
+                <div class="log-entry"><span class="timestamp">[SYSTEM]</span> Ready. Waiting for encrypted stream...</div>
+            </div>
+
+            <form id="console-form" class="cli-input">
+                <span class="prompt">></span>
+                <input type="text" id="cmd-input" placeholder="Execute command..." autocomplete="off">
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------
+        // CONFIGURATION
+        // ---------------------------------------------------------
+        const CONFIG = {
+            relay: ['https://gun-manhattan.herokuapp.com/gun'],
+            requiredRoom: '5678'
+        };
+
+        // ---------------------------------------------------------
+        // STATE
+        // ---------------------------------------------------------
+        let appState = {
+            user: null,
+            key: null,
+            room: null
+        };
+
+        // ---------------------------------------------------------
+        // GUN.JS SETUP
+        // ---------------------------------------------------------
+        let gun, sea, chatNode;
+
+        function initGun() {
+            gun = Gun(CONFIG.relay);
+            sea = Gun.SEA;
+        }
+
+        // ---------------------------------------------------------
+        // DOM ELEMENTS
+        // ---------------------------------------------------------
+        const authView = document.getElementById('auth-view');
+        const consoleView = document.getElementById('console-view');
+        const authForm = document.getElementById('auth-form');
+        const authStatus = document.getElementById('auth-status');
+        const consoleForm = document.getElementById('console-form');
+        const cmdInput = document.getElementById('cmd-input');
+        const logOutput = document.getElementById('log-output');
+        const sessionInfo = document.getElementById('session-info');
+
+        // ---------------------------------------------------------
+        // AUTHENTICATION LOGIC
+        // ---------------------------------------------------------
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const room = document.getElementById('room-id').value.trim();
+            const key = document.getElementById('enc-key').value.trim();
+
+            authStatus.textContent = "Verifying credentials...";
+            authStatus.className = "status-msg blink";
+
+            // Simulated handshake delay
+            await new Promise(r => setTimeout(r, 800));
+
+            // REQUIRED VALIDATION LOGIC
+            if (username === "rasya" && key === "123" && room === "5678") {
+                grantAccess(username, key, room);
+            } else if (username === "PENGGUNA1" && key === "1234" && room === "5678") {
+                grantAccess(username, key, room);
+            } else {
+                denyAccess();
+            }
+        });
+
+        function grantAccess(username, key, room) {
+            authStatus.textContent = "Access Granted. Initializing Environment...";
+            authStatus.className = "status-msg";
+            
+            appState.user = username;
+            appState.key = key;
+            appState.room = room;
+
+            setTimeout(() => {
+                authView.style.display = 'none';
+                consoleView.style.display = 'flex';
+                sessionInfo.textContent = `[USER: ${username}] [SECTOR: ${room}]`;
+                startChatSession();
+            }, 1000);
+        }
+
+        function denyAccess() {
+            authStatus.textContent = "System Error: Invalid Handshake";
+            authStatus.className = "status-msg error";
+        }
+
+        // ---------------------------------------------------------
+        // CHAT LOGIC
+        // ---------------------------------------------------------
+        function startChatSession() {
+            initGun();
+            
+            // Reference the specific room node
+            chatNode = gun.get('secure-console-v1').get(appState.room);
+
+            // Subscribe to updates
+            chatNode.map().on(async (encryptedData, id) => {
+                if (!encryptedData) return;
+
+                try {
+                    // Attempt to decrypt
+                    const decrypted = await sea.decrypt(encryptedData, appState.key);
+                    
+                    if (decrypted) {
+                        // Check if it's a valid message object
+                        if (decrypted.text && decrypted.user && decrypted.timestamp) {
+                            renderLogEntry(decrypted, id);
+                        }
+                    }
+                } catch (err) {
+                    // Ignore decryption failures (alien signals)
+                }
+            });
+        }
+
+        // ---------------------------------------------------------
+        // MESSAGE HANDLING
+        // ---------------------------------------------------------
+        consoleForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = cmdInput.value.trim();
+            if (!text) return;
+
+            const payload = {
+                text: text,
+                user: appState.user,
+                timestamp: Date.now()
+            };
+
+            // Encrypt before sending
+            const encrypted = await sea.encrypt(payload, appState.key);
+            
+            // Save to graph
+            chatNode.set(encrypted);
+            
+            cmdInput.value = '';
+        });
+
+        // ---------------------------------------------------------
+        // RENDERING
+        // ---------------------------------------------------------
+        const renderedIds = new Set();
+
+        function renderLogEntry(data, id) {
+            if (renderedIds.has(id)) return;
+            renderedIds.add(id);
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const time = new Date(data.timestamp).toLocaleTimeString('en-US', { hour12: false });
+            
+            // Determine user color class
+            let userClass = 'user-tag';
+            if (data.user === 'rasya') userClass += ' user-rasya';
+            if (data.user === 'PENGGUNA1') userClass += ' user-pengguna1';
+
+            entry.innerHTML = `
+                <span class="timestamp">[${time}]</span>
+                <span class="${userClass}">${data.user}</span>: 
+                <span>${escapeHtml(data.text)}</span>
+            `;
+
+            logOutput.appendChild(entry);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Focus input on load
+        window.onload = () => {
+            document.getElementById('username').focus();
+        };
+    </script>
+</body>
+</html>
